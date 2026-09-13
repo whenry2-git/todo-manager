@@ -21,7 +21,75 @@ function counts(){const a=tasks.filter(t=>!t.completed),p=a.filter(t=>t.type==="
 function row(t){const r=document.createElement("article");r.className=`task ${t.completed?"done":""} ${overdue(t)?"overdue":""}`;const stars="★".repeat(t.priority)+"☆".repeat(5-t.priority);r.innerHTML=`<label class="check-wrap"><input class="task-check" type="checkbox" ${t.completed?"checked":""}><span class="custom-check"></span></label><div class="task-main"><div class="task-title-row"><h3>${esc(t.title)}</h3><span class="type-badge ${t.type}">${typeLabel(t.type)}</span></div>${t.notes?`<p class="task-notes">${esc(t.notes)}</p>`:""}<div class="task-meta"><span class="priority" title="Priority ${t.priority} — ${priorityLabel(t.priority)}">${stars}</span><span>${timeLabel(t.time)}</span><span class="${overdue(t)?"due-overdue":""}">${formatDue(t.due_date)}</span></div></div><div class="task-actions"><button class="icon-button edit-task" title="Edit">✎</button><button class="icon-button delete-task" title="Delete">×</button></div>`;
 r.querySelector(".task-check").addEventListener("change",async e=>{const completed=e.target.checked;const {error}=await supabase.from("tasks").update({completed,completed_at:completed?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",t.id).eq("user_id",currentUser.id);if(error){e.target.checked=!completed;status(error.message);return}await loadTasks();status(completed?"Task completed.":"Task reopened.")});
 r.querySelector(".delete-task").addEventListener("click",async()=>{if(!confirm(`Delete "${t.title}"?`))return;const{error}=await supabase.from("tasks").delete().eq("id",t.id).eq("user_id",currentUser.id);if(error){status(error.message);return}await loadTasks();status("Task deleted.")});
-r.querySelector(".edit-task").addEventListener("click",async()=>{const title=prompt("Task",t.title);if(title===null)return;const clean=title.trim();if(!clean)return;const notes=prompt("Notes (optional)",t.notes||"");if(notes===null)return;const{error}=await supabase.from("tasks").update({title:clean.slice(0,200),notes:notes.slice(0,500),updated_at:new Date().toISOString()}).eq("id",t.id).eq("user_id",currentUser.id);if(error){status(error.message);return}await loadTasks();status("Task updated.")});return r}
+r.querySelector(".edit-task").addEventListener("click",()=>openEditModal(t));return r}
+
+let editingTaskId=null;
+
+function openEditModal(t){
+  editingTaskId=t.id;
+  $("editTitleInput").value=t.title||"";
+  $("editNotesInput").value=t.notes||"";
+  $("editTypeInput").value=t.type||"personal";
+  $("editPriorityInput").value=String(t.priority??3);
+  $("editTimeInput").value=String(t.time??1);
+  $("editDueInput").value=t.due_date||"";
+  $("editCompletedInput").checked=!!t.completed;
+  $("editModal").hidden=false;
+  document.body.classList.add("modal-open");
+  setTimeout(()=>$("editTitleInput").focus(),0);
+}
+
+function closeEditModal(){
+  editingTaskId=null;
+  $("editModal").hidden=true;
+  document.body.classList.remove("modal-open");
+}
+
+async function saveEdit(e){
+  e.preventDefault();
+  if(!editingTaskId||!currentUser)return;
+
+  const existing=tasks.find(x=>x.id===editingTaskId);
+  if(!existing)return;
+
+  const title=$("editTitleInput").value.trim();
+  if(!title){status("Task title is required.");$("editTitleInput").focus();return}
+
+  const completed=$("editCompletedInput").checked;
+  const now=new Date().toISOString();
+  const completedAt=completed?(existing.completed_at||now):null;
+
+  const changes={
+    title:title.slice(0,200),
+    notes:$("editNotesInput").value.trim().slice(0,500),
+    type:$("editTypeInput").value,
+    priority:Number($("editPriorityInput").value),
+    time:Number($("editTimeInput").value),
+    due_date:$("editDueInput").value||null,
+    completed,
+    completed_at:completedAt,
+    updated_at:now
+  };
+
+  $("editSave").disabled=true;
+  const {error}=await supabase.from("tasks").update(changes)
+    .eq("id",editingTaskId)
+    .eq("user_id",currentUser.id);
+  $("editSave").disabled=false;
+
+  if(error){status(error.message);return}
+  closeEditModal();
+  await loadTasks();
+  status("Task updated.");
+}
+
+$("editForm").addEventListener("submit",saveEdit);
+$("editCancelTop").addEventListener("click",closeEditModal);
+$("editTimeInput").innerHTML=TIME_OPTIONS.map(v=>`<option value="${v}">${timeLabel(v)}</option>`).join("");
+$("editCancel").addEventListener("click",closeEditModal);
+$("editModal").addEventListener("click",e=>{if(e.target===$("editModal"))closeEditModal()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("editModal").hidden)closeEditModal()});
+
 function render(){counts();document.querySelectorAll(".filter").forEach(b=>b.classList.toggle("active",b.dataset.filter===activeFilter));$("listTitle").textContent={all:"All tasks",personal:"Personal tasks",work:"Work tasks",completed:"Completed tasks"}[activeFilter];const v=visible(),a=tasks.filter(t=>!t.completed).length,total=tasks.filter(t=>!t.completed).reduce((s,t)=>s+Number(t.time||0),0);$("listSummary").textContent=`${v.length} shown · ${a} active · ${timeLabel(total)} total estimated`;$("tasks").innerHTML="";v.forEach(t=>$("tasks").appendChild(row(t)));$("emptyState").hidden=!!v.length}
 function resetForm(){$("taskForm").reset();$("typeInput").value="personal";$("priorityInput").value="3";$("timeInput").value="1"}
 async function session(session){currentUser=session?.user||null;$("authView").hidden=!!currentUser;$("appView").hidden=!currentUser;if(!currentUser){tasks=[];if(realtimeChannel){await supabase.removeChannel(realtimeChannel);realtimeChannel=null}return}$("userEmail").textContent=currentUser.email||"";await loadTasks();if(realtimeChannel)await supabase.removeChannel(realtimeChannel);realtimeChannel=supabase.channel(`tasks-${currentUser.id}`).on("postgres_changes",{event:"*",schema:"public",table:"tasks",filter:`user_id=eq.${currentUser.id}`},()=>loadTasks()).subscribe()}

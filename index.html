@@ -45,7 +45,33 @@
 
 <section class="card"><div class="list-header"><div><h2 id="listTitle">All tasks</h2><p id="listSummary"></p></div><span id="status" role="status"></span></div>
 <div id="tasks" class="tasks"></div><div id="emptyState" class="empty" hidden><div class="empty-icon">✓</div><h3>No tasks here</h3><p>Add a task above, or change your filter.</p></div></section>
-<footer class="app-footer"><span>To-Do Manager v2</span><span id="syncStatus">Cloud sync</span></footer>
+
+<div id="editModal" class="modal-backdrop" hidden>
+  <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <div class="modal-header">
+      <div>
+        <p class="eyebrow">Task Manager</p>
+        <h2 id="editModalTitle">Edit task</h2>
+        <p class="subtitle">Update any of the task details.</p>
+      </div>
+      <button id="editCancelTop" class="icon-button modal-close" type="button" title="Close" aria-label="Close">×</button>
+    </div>
+    <form id="editForm" class="edit-form">
+      <label class="field title-field"><span>Task</span><input id="editTitleInput" maxlength="200" required></label>
+      <label class="field"><span>Type</span><select id="editTypeInput"><option value="personal">Personal</option><option value="work">Work</option></select></label>
+      <label class="field"><span>Priority</span><select id="editPriorityInput"><option value="1">1 — Low</option><option value="2">2</option><option value="3">3 — Normal</option><option value="4">4 — High</option><option value="5">5 — Critical</option></select></label>
+      <label class="field"><span>Time</span><select id="editTimeInput"></select></label>
+      <label class="field"><span>Due date</span><input id="editDueInput" type="date"></label>
+      <label class="field notes-field"><span>Notes <small>(optional)</small></span><input id="editNotesInput" maxlength="500" placeholder="Add a note…"></label>
+      <label class="completed-field"><input id="editCompletedInput" type="checkbox"><span>Completed</span></label>
+      <div class="modal-actions">
+        <button id="editCancel" class="button secondary" type="button">Cancel</button>
+        <button id="editSave" class="button primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </section>
+</div>
+<footer class="app-footer"><span>To-Do Manager v2.1</span><span id="syncStatus">Cloud sync</span></footer>
 </div></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script><script src="app.js"></script>
