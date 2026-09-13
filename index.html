@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Simple personal and work to-do manager">
+  <title>To-Do Manager</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Task Manager</p>
+        <h1>To-Do</h1>
+        <p class="subtitle">Personal and work tasks, kept simple.</p>
+      </div>
+      <div class="header-actions">
+        <button id="clearCompleted" class="button secondary" type="button">Clear completed</button>
+      </div>
+    </header>
+
+    <section class="toolbar card" aria-label="Task controls">
+      <div class="toolbar-row">
+        <button class="filter active" data-filter="all" type="button">All <span id="allCount"></span></button>
+        <button class="filter" data-filter="personal" type="button">Personal <span id="personalCount"></span></button>
+        <button class="filter" data-filter="work" type="button">Work <span id="workCount"></span></button>
+        <button class="filter" data-filter="completed" type="button">Completed <span id="completedCount"></span></button>
+      </div>
+      <div class="toolbar-row secondary-row">
+        <label>
+          <span>Sort</span>
+          <select id="sortSelect">
+            <option value="priority">Priority</option>
+            <option value="due">Due date</option>
+            <option value="time">Time</option>
+            <option value="created">Recently added</option>
+            <option value="title">Title</option>
+          </select>
+        </label>
+        <label class="search">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Search tasks…">
+        </label>
+      </div>
+    </section>
+
+    <section class="card add-card">
+      <div class="section-heading">
+        <div>
+          <h2>Add task</h2>
+          <p>Capture it now; refine it later.</p>
+        </div>
+      </div>
+      <form id="taskForm" class="task-form">
+        <label class="field title-field">
+          <span>Task</span>
+          <input id="titleInput" name="title" maxlength="200" required placeholder="What needs to be done?">
+        </label>
+
+        <label class="field">
+          <span>Type</span>
+          <select id="typeInput" name="type">
+            <option value="personal">Personal</option>
+            <option value="work">Work</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Priority</span>
+          <select id="priorityInput" name="priority">
+            <option value="1">1 — Low</option>
+            <option value="2">2</option>
+            <option value="3" selected>3 — Normal</option>
+            <option value="4">4 — High</option>
+            <option value="5">5 — Critical</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Time</span>
+          <select id="timeInput" name="time"></select>
+        </label>
+
+        <label class="field">
+          <span>Due date</span>
+          <input id="dueInput" name="dueDate" type="date">
+        </label>
+
+        <label class="field notes-field">
+          <span>Notes <small>(optional)</small></span>
+          <input id="notesInput" name="notes" maxlength="500" placeholder="Add a note…">
+        </label>
+
+        <button class="button primary add-button" type="submit">Add task</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="list-header">
+        <div>
+          <h2 id="listTitle">All tasks</h2>
+          <p id="listSummary"></p>
+        </div>
+        <span id="status" role="status" aria-live="polite"></span>
+      </div>
+      <div id="tasks" class="tasks"></div>
+      <div id="emptyState" class="empty" hidden>
+        <div class="empty-icon">✓</div>
+        <h3>No tasks here</h3>
+        <p>Add a task above, or change your filter.</p>
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      <span>To-Do Manager v1</span>
+      <span>Local storage now · cloud sync ready for the shared backend later</span>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
