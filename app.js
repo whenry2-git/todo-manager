@@ -1,325 +1,39 @@
 (() => {
-  "use strict";
-
-  const STORAGE_KEY = "todo-manager-v1";
-  const TIME_OPTIONS = [0, ...Array.from({ length: 24 }, (_, i) => (i + 1) * 0.5)];
-
-  let state = loadState();
-  let activeFilter = "all";
-  let searchTerm = "";
-  let sortMode = "priority";
-
-  const $ = id => document.getElementById(id);
-  const tasksEl = $("tasks");
-  const emptyState = $("emptyState");
-  const form = $("taskForm");
-  const titleInput = $("titleInput");
-  const typeInput = $("typeInput");
-  const priorityInput = $("priorityInput");
-  const timeInput = $("timeInput");
-  const dueInput = $("dueInput");
-  const notesInput = $("notesInput");
-  const searchInput = $("searchInput");
-  const sortSelect = $("sortSelect");
-  const statusEl = $("status");
-
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return { tasks: [] };
-      const parsed = JSON.parse(raw);
-      if (!parsed || !Array.isArray(parsed.tasks)) throw new Error("Invalid state");
-
-      parsed.tasks = parsed.tasks
-        .filter(t => t && typeof t.id === "string" && typeof t.title === "string")
-        .map(normalizeTask);
-
-      return parsed;
-    } catch {
-      return { tasks: [] };
-    }
-  }
-
-  function normalizeTask(task) {
-    const priority = Number(task.priority);
-    const time = Number(task.time);
-    return {
-      id: task.id,
-      title: String(task.title).trim().slice(0, 200),
-      notes: String(task.notes || "").slice(0, 500),
-      type: task.type === "work" ? "work" : "personal",
-      priority: Number.isInteger(priority) && priority >= 1 && priority <= 5 ? priority : 3,
-      time: Number.isFinite(time) && time >= 0 ? Math.round(time * 2) / 2 : 0,
-      dueDate: task.dueDate || "",
-      completed: !!task.completed,
-      createdAt: task.createdAt || new Date().toISOString(),
-      completedAt: task.completedAt || null
-    };
-  }
-
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-
-  function makeId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  }
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, c => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-    }[c]));
-  }
-
-  function timeLabel(value) {
-    const n = Number(value);
-    if (n === 0) return "<30 min";
-    if (n === 0.5) return "30 min";
-    if (Number.isInteger(n)) return `${n} ${n === 1 ? "hour" : "hours"}`;
-    return `${Math.floor(n)} hr 30 min`;
-  }
-
-  function priorityLabel(priority) {
-    return ["", "Low", "Below normal", "Normal", "High", "Critical"][priority] || "Normal";
-  }
-
-  function typeLabel(type) {
-    return type === "work" ? "Work" : "Personal";
-  }
-
-  function formatDue(date) {
-    if (!date) return "No due date";
-    const d = new Date(`${date}T00:00:00`);
-    if (Number.isNaN(d.getTime())) return "No due date";
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (d.getTime() === today.getTime()) return "Today";
-    if (d.getTime() === tomorrow.getTime()) return "Tomorrow";
-
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-  }
-
-  function isOverdue(task) {
-    if (!task.dueDate || task.completed) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return new Date(`${task.dueDate}T00:00:00`) < today;
-  }
-
-  function getVisibleTasks() {
-    let result = state.tasks.filter(task => {
-      if (activeFilter === "personal" && task.type !== "personal") return false;
-      if (activeFilter === "work" && task.type !== "work") return false;
-      if (activeFilter === "completed" && !task.completed) return false;
-      if (activeFilter !== "completed" && task.completed) return false;
-
-      if (searchTerm) {
-        const haystack = `${task.title} ${task.notes}`.toLowerCase();
-        if (!haystack.includes(searchTerm)) return false;
-      }
-      return true;
-    });
-
-    result.sort((a, b) => {
-      if (sortMode === "priority") {
-        if (b.priority !== a.priority) return b.priority - a.priority;
-        if (a.completed !== b.completed) return Number(a.completed) - Number(b.completed);
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      }
-      if (sortMode === "due") {
-        if (!a.dueDate && !b.dueDate) return new Date(b.createdAt) - new Date(a.createdAt);
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return a.dueDate.localeCompare(b.dueDate);
-      }
-      if (sortMode === "time") return b.time - a.time;
-      if (sortMode === "title") return a.title.localeCompare(b.title);
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-
-    return result;
-  }
-
-  function updateCounts() {
-    const active = state.tasks.filter(t => !t.completed);
-    $("allCount").textContent = active.length ? `(${active.length})` : "";
-    $("personalCount").textContent = active.filter(t => t.type === "personal").length ? `(${active.filter(t => t.type === "personal").length})` : "";
-    $("workCount").textContent = active.filter(t => t.type === "work").length ? `(${active.filter(t => t.type === "work").length})` : "";
-    $("completedCount").textContent = state.tasks.filter(t => t.completed).length ? `(${state.tasks.filter(t => t.completed).length})` : "";
-  }
-
-  function setStatus(text) {
-    statusEl.textContent = text;
-    clearTimeout(setStatus.timer);
-    setStatus.timer = setTimeout(() => statusEl.textContent = "", 2200);
-  }
-
-  function renderTask(task) {
-    const row = document.createElement("article");
-    row.className = `task ${task.completed ? "done" : ""} ${isOverdue(task) ? "overdue" : ""}`;
-    row.dataset.id = task.id;
-
-    const stars = "★".repeat(task.priority) + "☆".repeat(5 - task.priority);
-    const dueText = formatDue(task.dueDate);
-
-    row.innerHTML = `
-      <label class="check-wrap">
-        <input class="task-check" type="checkbox" ${task.completed ? "checked" : ""} aria-label="Complete ${escapeHtml(task.title)}">
-        <span class="custom-check" aria-hidden="true"></span>
-      </label>
-      <div class="task-main">
-        <div class="task-title-row">
-          <h3>${escapeHtml(task.title)}</h3>
-          <span class="type-badge ${task.type}">${typeLabel(task.type)}</span>
-        </div>
-        ${task.notes ? `<p class="task-notes">${escapeHtml(task.notes)}</p>` : ""}
-        <div class="task-meta">
-          <span class="priority" title="Priority ${task.priority} — ${priorityLabel(task.priority)}">${stars}</span>
-          <span>${timeLabel(task.time)}</span>
-          <span class="${isOverdue(task) ? "due-overdue" : ""}">${dueText}</span>
-        </div>
-      </div>
-      <div class="task-actions">
-        <button class="icon-button edit-task" type="button" title="Edit task" aria-label="Edit task">✎</button>
-        <button class="icon-button delete-task" type="button" title="Delete task" aria-label="Delete task">×</button>
-      </div>
-    `;
-
-    row.querySelector(".task-check").addEventListener("change", event => {
-      task.completed = event.target.checked;
-      task.completedAt = task.completed ? new Date().toISOString() : null;
-      save();
-      render();
-      setStatus(task.completed ? "Task completed." : "Task reopened.");
-    });
-
-    row.querySelector(".delete-task").addEventListener("click", () => {
-      state.tasks = state.tasks.filter(t => t.id !== task.id);
-      save();
-      render();
-      setStatus("Task deleted.");
-    });
-
-    row.querySelector(".edit-task").addEventListener("click", () => openEdit(task));
-
-    return row;
-  }
-
-  function render() {
-    updateCounts();
-    document.querySelectorAll(".filter").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.filter === activeFilter);
-    });
-
-    const titles = {
-      all: "All tasks",
-      personal: "Personal tasks",
-      work: "Work tasks",
-      completed: "Completed tasks"
-    };
-    $("listTitle").textContent = titles[activeFilter];
-
-    const visible = getVisibleTasks();
-    const activeCount = state.tasks.filter(t => !t.completed).length;
-    const totalTime = state.tasks.filter(t => !t.completed).reduce((sum, t) => sum + t.time, 0);
-    $("listSummary").textContent = `${visible.length} shown · ${activeCount} active · ${timeLabel(totalTime)} total estimated`;
-
-    tasksEl.innerHTML = "";
-    visible.forEach(task => tasksEl.appendChild(renderTask(task)));
-
-    emptyState.hidden = visible.length > 0;
-  }
-
-  function populateTimeOptions() {
-    timeInput.innerHTML = TIME_OPTIONS.map(value => {
-      const selected = value === 1 ? " selected" : "";
-      return `<option value="${value}"${selected}>${timeLabel(value)}</option>`;
-    }).join("");
-  }
-
-  function resetForm() {
-    form.reset();
-    typeInput.value = "personal";
-    priorityInput.value = "3";
-    timeInput.value = "1";
-  }
-
-  function openEdit(task) {
-    const newTitle = prompt("Task", task.title);
-    if (newTitle === null) return;
-    const cleanTitle = newTitle.trim();
-    if (!cleanTitle) return;
-
-    const newNotes = prompt("Notes (optional)", task.notes || "");
-    if (newNotes === null) return;
-
-    task.title = cleanTitle.slice(0, 200);
-    task.notes = newNotes.slice(0, 500);
-    save();
-    render();
-    setStatus("Task updated.");
-  }
-
-  form.addEventListener("submit", event => {
-    event.preventDefault();
-    const title = titleInput.value.trim();
-    if (!title) return;
-
-    const task = {
-      id: makeId(),
-      title: title.slice(0, 200),
-      notes: notesInput.value.trim().slice(0, 500),
-      type: typeInput.value,
-      priority: Number(priorityInput.value),
-      time: Number(timeInput.value),
-      dueDate: dueInput.value,
-      completed: false,
-      createdAt: new Date().toISOString(),
-      completedAt: null
-    };
-
-    state.tasks.push(task);
-    save();
-    resetForm();
-    render();
-    setStatus("Task added.");
-    titleInput.focus();
-  });
-
-  document.querySelectorAll(".filter").forEach(button => {
-    button.addEventListener("click", () => {
-      activeFilter = button.dataset.filter;
-      render();
-    });
-  });
-
-  searchInput.addEventListener("input", event => {
-    searchTerm = event.target.value.trim().toLowerCase();
-    render();
-  });
-
-  sortSelect.addEventListener("change", event => {
-    sortMode = event.target.value;
-    render();
-  });
-
-  $("clearCompleted").addEventListener("click", () => {
-    const completed = state.tasks.filter(t => t.completed).length;
-    if (!completed) {
-      setStatus("No completed tasks to clear.");
-      return;
-    }
-    if (!confirm(`Remove ${completed} completed task${completed === 1 ? "" : "s"}?`)) return;
-    state.tasks = state.tasks.filter(t => !t.completed);
-    save();
-    render();
-    setStatus("Completed tasks cleared.");
-  });
-
-  populateTimeOptions();
-  resetForm();
-  render();
+"use strict";
+const { createClient } = window.supabase;
+const supabase = createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.publishableKey, {
+  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
+});
+const TIME_OPTIONS=[0,...Array.from({length:24},(_,i)=>(i+1)*.5)];
+let tasks=[],activeFilter="all",searchTerm="",sortMode="priority",authMode="signin",currentUser=null,realtimeChannel=null;
+const $=id=>document.getElementById(id);
+const timeLabel=v=>{v=Number(v);if(v===0)return"<30 min";if(v===.5)return"30 min";if(Number.isInteger(v))return`${v} ${v===1?"hour":"hours"}`;return`${Math.floor(v)} hr 30 min`};
+const priorityLabel=p=>["","Low","Below normal","Normal","High","Critical"][p]||"Normal";
+const typeLabel=t=>t==="work"?"Work":"Personal";
+const esc=v=>String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const formatDue=d=>{if(!d)return"No due date";const x=new Date(`${d}T00:00:00`),today=new Date();today.setHours(0,0,0,0);const tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);if(x.getTime()===today.getTime())return"Today";if(x.getTime()===tomorrow.getTime())return"Tomorrow";return x.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})};
+const overdue=t=>{if(!t.due_date||t.completed)return false;const d=new Date();d.setHours(0,0,0,0);return new Date(`${t.due_date}T00:00:00`)<d};
+function status(t){$("status").textContent=t;clearTimeout(status.timer);status.timer=setTimeout(()=>$("status").textContent="",2200)}
+function sync(t){$("syncStatus").textContent=t}
+async function loadTasks(){sync("Syncing…");const {data,error}=await supabase.from("tasks").select("*").order("completed",{ascending:true}).order("priority",{ascending:false}).order("created_at",{ascending:false});if(error){console.error(error);sync("Sync error");status(error.message);return}tasks=data||[];sync("Cloud sync active");render()}
+function visible(){let r=tasks.filter(t=>{if(activeFilter==="personal"&&t.type!=="personal")return false;if(activeFilter==="work"&&t.type!=="work")return false;if(activeFilter==="completed"&&!t.completed)return false;if(activeFilter!=="completed"&&t.completed)return false;if(searchTerm&&!`${t.title} ${t.notes||""}`.toLowerCase().includes(searchTerm))return false;return true});r.sort((a,b)=>{if(sortMode==="priority")return b.priority-a.priority||new Date(b.created_at)-new Date(a.created_at);if(sortMode==="due"){if(!a.due_date&&!b.due_date)return 0;if(!a.due_date)return 1;if(!b.due_date)return-1;return a.due_date.localeCompare(b.due_date)}if(sortMode==="time")return b.time-a.time;if(sortMode==="title")return a.title.localeCompare(b.title);return new Date(b.created_at)-new Date(a.created_at)});return r}
+function counts(){const a=tasks.filter(t=>!t.completed),p=a.filter(t=>t.type==="personal").length,w=a.filter(t=>t.type==="work").length,c=tasks.filter(t=>t.completed).length;$("allCount").textContent=a.length?`(${a.length})`:"";$("personalCount").textContent=p?`(${p})`:"";$("workCount").textContent=w?`(${w})`:"";$("completedCount").textContent=c?`(${c})`:""}
+function row(t){const r=document.createElement("article");r.className=`task ${t.completed?"done":""} ${overdue(t)?"overdue":""}`;const stars="★".repeat(t.priority)+"☆".repeat(5-t.priority);r.innerHTML=`<label class="check-wrap"><input class="task-check" type="checkbox" ${t.completed?"checked":""}><span class="custom-check"></span></label><div class="task-main"><div class="task-title-row"><h3>${esc(t.title)}</h3><span class="type-badge ${t.type}">${typeLabel(t.type)}</span></div>${t.notes?`<p class="task-notes">${esc(t.notes)}</p>`:""}<div class="task-meta"><span class="priority" title="Priority ${t.priority} — ${priorityLabel(t.priority)}">${stars}</span><span>${timeLabel(t.time)}</span><span class="${overdue(t)?"due-overdue":""}">${formatDue(t.due_date)}</span></div></div><div class="task-actions"><button class="icon-button edit-task" title="Edit">✎</button><button class="icon-button delete-task" title="Delete">×</button></div>`;
+r.querySelector(".task-check").addEventListener("change",async e=>{const completed=e.target.checked;const {error}=await supabase.from("tasks").update({completed,completed_at:completed?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",t.id).eq("user_id",currentUser.id);if(error){e.target.checked=!completed;status(error.message);return}await loadTasks();status(completed?"Task completed.":"Task reopened.")});
+r.querySelector(".delete-task").addEventListener("click",async()=>{if(!confirm(`Delete "${t.title}"?`))return;const{error}=await supabase.from("tasks").delete().eq("id",t.id).eq("user_id",currentUser.id);if(error){status(error.message);return}await loadTasks();status("Task deleted.")});
+r.querySelector(".edit-task").addEventListener("click",async()=>{const title=prompt("Task",t.title);if(title===null)return;const clean=title.trim();if(!clean)return;const notes=prompt("Notes (optional)",t.notes||"");if(notes===null)return;const{error}=await supabase.from("tasks").update({title:clean.slice(0,200),notes:notes.slice(0,500),updated_at:new Date().toISOString()}).eq("id",t.id).eq("user_id",currentUser.id);if(error){status(error.message);return}await loadTasks();status("Task updated.")});return r}
+function render(){counts();document.querySelectorAll(".filter").forEach(b=>b.classList.toggle("active",b.dataset.filter===activeFilter));$("listTitle").textContent={all:"All tasks",personal:"Personal tasks",work:"Work tasks",completed:"Completed tasks"}[activeFilter];const v=visible(),a=tasks.filter(t=>!t.completed).length,total=tasks.filter(t=>!t.completed).reduce((s,t)=>s+Number(t.time||0),0);$("listSummary").textContent=`${v.length} shown · ${a} active · ${timeLabel(total)} total estimated`;$("tasks").innerHTML="";v.forEach(t=>$("tasks").appendChild(row(t)));$("emptyState").hidden=!!v.length}
+function resetForm(){$("taskForm").reset();$("typeInput").value="personal";$("priorityInput").value="3";$("timeInput").value="1"}
+async function session(session){currentUser=session?.user||null;$("authView").hidden=!!currentUser;$("appView").hidden=!currentUser;if(!currentUser){tasks=[];if(realtimeChannel){await supabase.removeChannel(realtimeChannel);realtimeChannel=null}return}$("userEmail").textContent=currentUser.email||"";await loadTasks();if(realtimeChannel)await supabase.removeChannel(realtimeChannel);realtimeChannel=supabase.channel(`tasks-${currentUser.id}`).on("postgres_changes",{event:"*",schema:"public",table:"tasks",filter:`user_id=eq.${currentUser.id}`},()=>loadTasks()).subscribe()}
+async function auth(e){e.preventDefault();const email=$("emailInput").value.trim(),password=$("passwordInput").value;$("authMessage").textContent="Working…";$("authSubmit").disabled=true;const r=authMode==="signin"?await supabase.auth.signInWithPassword({email,password}):await supabase.auth.signUp({email,password});$("authSubmit").disabled=false;if(r.error){$("authMessage").textContent=r.error.message;return}if(authMode==="signup"&&!r.data.session){$("authMessage").textContent="Account created. Check your email to confirm it, then sign in.";return}$("authMessage").textContent=""}
+$("authForm").addEventListener("submit",auth);
+$("authToggle").addEventListener("click",()=>{authMode=authMode==="signin"?"signup":"signin";$("authSubmit").textContent=authMode==="signin"?"Sign in":"Create account";$("authToggle").textContent=authMode==="signin"?"Create an account":"I already have an account";$("authMessage").textContent=""});
+$("signOut").addEventListener("click",()=>supabase.auth.signOut());
+$("taskForm").addEventListener("submit",async e=>{e.preventDefault();if(!currentUser)return;const title=$("titleInput").value.trim();if(!title)return;const{error}=await supabase.from("tasks").insert({user_id:currentUser.id,title:title.slice(0,200),notes:$("notesInput").value.trim().slice(0,500),type:$("typeInput").value,priority:Number($("priorityInput").value),time:Number($("timeInput").value),due_date:$("dueInput").value||null,completed:false});if(error){status(error.message);return}resetForm();await loadTasks();status("Task added.");$("titleInput").focus()});
+document.querySelectorAll(".filter").forEach(b=>b.addEventListener("click",()=>{activeFilter=b.dataset.filter;render()}));
+$("searchInput").addEventListener("input",e=>{searchTerm=e.target.value.trim().toLowerCase();render()});
+$("sortSelect").addEventListener("change",e=>{sortMode=e.target.value;render()});
+$("clearCompleted").addEventListener("click",async()=>{const n=tasks.filter(t=>t.completed).length;if(!n){status("No completed tasks to clear.");return}if(!confirm(`Remove ${n} completed task${n===1?"":"s"}?`))return;const{error}=await supabase.from("tasks").delete().eq("user_id",currentUser.id).eq("completed",true);if(error){status(error.message);return}await loadTasks();status("Completed tasks cleared.")});
+$("timeInput").innerHTML=TIME_OPTIONS.map(v=>`<option value="${v}"${v===1?" selected":""}>${timeLabel(v)}</option>`).join("");resetForm();
+(async()=>{const{data:{session:s}}=await supabase.auth.getSession();await session(s);supabase.auth.onAuthStateChange((_e,s)=>setTimeout(()=>session(s),0))})();
 })();
