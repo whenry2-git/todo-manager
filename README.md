@@ -12,3 +12,8 @@ The same Supabase Auth account can be used by Checklist Manager and To-Do Manage
 The browser uses the Supabase publishable key. That key is safe to expose in a browser; Row Level Security protects the data. Never put a secret/service-role key in GitHub.
 
 The task time field uses 0 for less than 30 minutes, then 0.5-hour increments.
+
+
+## v2.2.1 — Today's Focus
+
+Run `supabase-tasks.sql` in Supabase SQL Editor. It safely adds the `today` column and index to the existing `tasks` table. Realtime is not re-added because it is already enabled for `tasks`.
