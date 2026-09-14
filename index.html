@@ -32,6 +32,11 @@
 <label class="search"><span>Search</span><input id="searchInput" type="search" placeholder="Search tasks…"></label>
 </div></section>
 
+<section id="todayFocus" class="today-focus card">
+  <div class="section-heading"><h2>Today's Focus</h2><p id="todayFocusCount">No tasks selected</p></div>
+  <div id="todayFocusList" class="today-focus-list"></div>
+</section>
+
 <section class="card add-card"><div class="section-heading"><h2>Add task</h2><p>Capture it now; refine it later.</p></div>
 <form id="taskForm" class="task-form">
 <label class="field title-field"><span>Task</span><input id="titleInput" maxlength="200" required placeholder="What needs to be done?"></label>
@@ -63,7 +68,7 @@
       <label class="field"><span>Time</span><select id="editTimeInput"></select></label>
       <label class="field"><span>Due date</span><input id="editDueInput" type="date"></label>
       <label class="field notes-field"><span>Notes <small>(optional)</small></span><input id="editNotesInput" maxlength="500" placeholder="Add a note…"></label>
-      <label class="completed-field"><input id="editCompletedInput" type="checkbox"><span>Completed</span></label>
+      <div class="edit-checks"><label class="completed-field"><input id="editCompletedInput" type="checkbox"><span>Completed</span></label><label class="completed-field"><input id="editTodayInput" type="checkbox"><span>Today's Focus</span></label></div>
       <div class="modal-actions">
         <button id="editCancel" class="button secondary" type="button">Cancel</button>
         <button id="editSave" class="button primary" type="submit">Save changes</button>
