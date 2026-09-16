@@ -40,9 +40,18 @@
 <section class="card add-card"><div class="section-heading"><h2>Add task</h2><p>Capture it now; refine it later.</p></div>
 <form id="taskForm" class="task-form">
 <label class="field title-field"><span>Task</span><input id="titleInput" maxlength="200" required placeholder="What needs to be done?"></label>
-<label class="field"><span>Type</span><select id="typeInput"><option value="personal">Personal</option><option value="work">Work</option></select></label>
+<label class="field"><span>Type</span><select id="typeInput"><option value="personal">Personal</option><option value="work" selected>Work</option></select></label>
 <label class="field"><span>Priority</span><select id="priorityInput"><option value="1">1 — Low</option><option value="2">2</option><option value="3" selected>3 — Normal</option><option value="4">4 — High</option><option value="5">5 — Critical</option></select></label>
-<label class="field"><span>Time</span><select id="timeInput"></select></label>
+<label class="field"><span>Time</span><select id="timeInput"><option value="0">&lt;30 min</option>
+<option value="0.5" selected>30 min</option>
+<option value="1">1 hour</option>
+<option value="1.5">1 hr 30 min</option>
+<option value="2">2 hours</option>
+<option value="2.5">2 hr 30 min</option>
+<option value="3">3 hours</option>
+<option value="3.5">3 hr 30 min</option>
+<option value="4">4 hours</option>
+<option value="8">&gt;1 day</option></select></label>
 <label class="field"><span>Due date</span><input id="dueInput" type="date"></label>
 <label class="field notes-field"><span>Notes <small>(optional)</small></span><input id="notesInput" maxlength="500" placeholder="Add a note…"></label>
 <button class="button primary add-button" type="submit">Add task</button>
@@ -76,7 +85,7 @@
     </form>
   </section>
 </div>
-<footer class="app-footer"><span>To-Do Manager v2.2</span><span id="syncStatus">Cloud sync</span></footer>
+<footer class="app-footer"><span>To-Do Manager v2.3</span><span id="syncStatus">Cloud sync</span></footer>
 </div></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script><script src="app.js"></script>
