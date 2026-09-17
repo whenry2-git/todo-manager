@@ -137,7 +137,37 @@ $("editCancel").addEventListener("click",closeEditModal);
 $("editModal").addEventListener("click",e=>{if(e.target===$("editModal"))closeEditModal()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("editModal").hidden)closeEditModal()});
 
-function render(){renderTodaysFocus();counts();document.querySelectorAll(".filter").forEach(b=>b.classList.toggle("active",b.dataset.filter===activeFilter));$("listTitle").textContent={all:"All tasks",personal:"Personal tasks",work:"Work tasks",completed:"Completed tasks"}[activeFilter];const v=visible(),a=tasks.filter(t=>!t.completed).length,total=tasks.filter(t=>!t.completed).reduce((s,t)=>s+Number(t.time||0),0);$("listSummary").textContent=`${v.length} shown · ${a} active · ${timeLabel(total)} total estimated`;$("tasks").innerHTML="";v.forEach(t=>$("tasks").appendChild(row(t)));$("emptyState").hidden=!!v.length}
+
+function renderCompletedStats(){
+  const active=tasks.filter(t=>!t.completed);
+  const completed=tasks.filter(t=>t.completed);
+  const levels=[1,2,3,4,5];
+  const counts=arr=>levels.map(p=>({p,n:arr.filter(t=>Number(t.priority)===p).length}));
+  const total=tasks.length;
+  const rate=total?Math.round(completed.length/total*100):0;
+  $("statsTotal").textContent=total;
+  $("statsCompleted").textContent=completed.length;
+  $("statsRate").textContent=`${rate}%`;
+  $("statsTime").textContent=statsTime(completed);
+  $("existingPriorityChart").innerHTML=priorityBars(counts(active),"active");
+  $("completedPriorityChart").innerHTML=priorityBars(counts(completed),"completed");
+}
+function statsTime(arr){
+  const mins=arr.reduce((sum,t)=>{const v=Number(t.time);return sum+(v===8?0:Math.round(v*60))},0);
+  const h=Math.floor(mins/60),m=mins%60;
+  return h?`${h} hr${h===1?"":"s"}${m?` ${m} min`:""}`:`${m} min`;
+}
+function priorityBars(rows,kind){
+  const max=Math.max(1,...rows.map(x=>x.n));
+  return `<div class="priority-chart-bars">${rows.map(x=>`
+    <div class="priority-bar-col">
+      <div class="priority-bar-value">${x.n}</div>
+      <div class="priority-bar-track"><div class="priority-bar-fill ${kind}" style="height:${Math.max(4,x.n/max*100)}%"></div></div>
+      <div class="priority-bar-label">${x.p}</div>
+    </div>`).join("")}</div>`;
+}
+
+function render(){const completedView=activeFilter==="completed";document.body.classList.toggle("completed-view",completedView);$("todayFocus").hidden=completedView;$("addCard").hidden=completedView;$("clearCompleted").hidden=!completedView;renderTodaysFocus();renderCompletedStats();counts();document.querySelectorAll(".filter").forEach(b=>b.classList.toggle("active",b.dataset.filter===activeFilter));$("listTitle").textContent={all:"All tasks",personal:"Personal tasks",work:"Work tasks",completed:"Completed tasks"}[activeFilter];const v=visible(),a=tasks.filter(t=>!t.completed).length,total=tasks.filter(t=>!t.completed).reduce((s,t)=>s+Number(t.time||0),0);$("listSummary").textContent=`${v.length} shown · ${a} active · ${timeLabel(total)} total estimated`;$("tasks").innerHTML="";v.forEach(t=>$("tasks").appendChild(row(t)));$("emptyState").hidden=!!v.length}
 function defaultAddType(){return activeFilter==="personal"?"personal":"work"}
 function resetForm(){$("taskForm").reset();$("typeInput").value=defaultAddType();$("priorityInput").value="3";$("timeInput").value=".5"}
 async function session(session){currentUser=session?.user||null;$("authView").hidden=!!currentUser;$("appView").hidden=!currentUser;if(!currentUser){tasks=[];if(realtimeChannel){await supabase.removeChannel(realtimeChannel);realtimeChannel=null}return}$("userEmail").textContent=currentUser.email||"";await loadTasks();if(realtimeChannel)await supabase.removeChannel(realtimeChannel);realtimeChannel=supabase.channel(`tasks-${currentUser.id}`).on("postgres_changes",{event:"*",schema:"public",table:"tasks",filter:`user_id=eq.${currentUser.id}`},()=>loadTasks()).subscribe()}
